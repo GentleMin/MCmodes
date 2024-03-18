@@ -4,6 +4,7 @@ figures/
 # Other files and folders
 .settings/
 __pycache__/
+.ipynb_checkpoints
 .DS_Store
 scripts/.ipynb_checkpoints/
 .idea/
