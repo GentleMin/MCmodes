@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as scsp
 from sympy.abc import r
 from sympy import lambdify, simplify, diff
-from sympy.parsing.mathematica import mathematica
+from sympy.parsing.mathematica import parse_mathematica
 from scipy import special
 from abc import ABC, abstractmethod
 
@@ -321,7 +321,7 @@ class SphericalHarmonicMode:
         self.l = l
         self.m = m
         if isinstance(radial_func, str):
-            self.radial_expr = mathematica(radial_func)
+            self.radial_expr = parse_mathematica(radial_func)
             self.radial_func = lambdify(r, self.radial_expr, "numpy")
         else:
             self.radial_expr = radial_func
