@@ -319,15 +319,59 @@ Eigenvalue processing
 -----------------------------
 """
 
-def cluster_modes(eig_vals: np.ndarray, rtol: float = 1e-5, atol: float = 1e-8):
+def cluster_modes(
+    eig_vals: np.ndarray, rtol: float = 1e-5, atol: float = 1e-8, 
+    mode: Literal["global", "sorted"] = "global") -> np.ndarray:
     """Clustering of eigenvalues.
+    
     This function takes in an array of eigenvalues, and decide whether they
     are degenerate or distinct, and then outputs the clustered result.
     
     :param np.ndarray eig_vals: array of eigenvalues;
     :param float rtol: relative tolerance between eigenvalues considered degenerate
     :param float atol: absolute tolerance between eigenvalues considered degenerate
+    :param Literal["global", "sorted"] mode: which mode to use;
+    
+        * "sorted" mode assumes that the array is sorted in a way such that 
+          the degenerate eigenvalues / eigenvalues of the same mode are adjacent,
+          and has the complexity of O(N)
+        * "global" mode drops this assumption, but has complexity O(N^2)
+        
     :returns: index of distinct modes, degenerate ones share the same index
+    
+    """
+    if mode == "global":
+        return _cluster_modes_global(eig_vals, rtol, atol)
+    elif mode == "sorted":
+        return _cluster_modes_sorted(eig_vals, rtol, atol)
+    else:
+        raise ValueError(
+            f"Clustering mode can only be global or sorted but got {mode}."
+        )
+
+
+def _cluster_modes_global(eig_vals: np.ndarray, rtol: float, 
+    atol: float) -> np.ndarray:
+    """Clustering of eigenvalues in arbitrary order
+    
+    See :py:func:`cluster_modes` for parameter details
+    """
+    mode_count = 0
+    mode_idx = np.full(eig_vals.shape, fill_value=-1, dtype=np.int32)
+    for i_eig, eig_ref in enumerate(eig_vals):
+        if mode_idx[i_eig] >= 0:
+            continue
+        i_vicinity = np.abs(eig_vals - eig_ref) < rtol*np.abs(eig_ref) + atol
+        mode_idx[i_vicinity] = mode_count
+        mode_count += 1
+    return mode_idx
+
+
+def _cluster_modes_sorted(eig_vals: np.ndarray, rtol: float, 
+    atol: float) -> np.ndarray:
+    """Clustering of sorted eigenvalues.
+    
+    See :py:func:`cluster_modes` for parameter details
     
     .. note:: The input eigenvalue array should be already "sorted" in some ways,
         so that clustering only occurs for adjacent eigenvalues.
@@ -352,19 +396,57 @@ def cluster_modes(eig_vals: np.ndarray, rtol: float = 1e-5, atol: float = 1e-8):
     return np.array(modes)
 
 
-def intermodal_separation(eig_vals: np.ndarray, **opt_cluster) -> np.ndarray:
+def intermodal_separation(
+    eig_vals: np.ndarray, 
+    mode: Literal["global", "sorted"] = "global", 
+    **opt_cluster) -> np.ndarray:
     """Calculate intermodal separation ([Boyd]_)
     
     :param np.ndarray eig_vals: array of eigenvalues
+    :param Literal["global", "sorted"] mode: clustering and separation mode
+    
+        * "sorted" mode assumes that the array is sorted in a way such that 
+          the degenerate eigenvalues / eigenvalues of the same mode are adjacent,
+          and has the complexity of O(N) in both clustering and calculating sep
+        * "global" mode drops this assumption; algorithm has complexity O(N^2)
+    
     :param \**opt_cluster: keywords for clustering options, 
         see :py:func:`cluster_modes`
+            
+    .. [Boyd] Boyd, *Chebyshev and Fourier Spectral Methods*.
+    """
+    if mode == "global":
+        return _intermodal_separation_global(eig_vals, **opt_cluster)
+    elif mode == "sorted":
+        return _intermodal_separation_sorted(eig_vals, **opt_cluster)
+    else:
+        raise ValueError(f"Mode can only be global or sorted but got {mode}.")
+
+
+def _intermodal_separation_global(eig_vals: np.ndarray, **opt_cluster) -> np.ndarray:
+    """Calculate intermodal separation for eigenvalues in arb order
+    
+    See :py:func:`intermodal_separation` for parameter details
+    """
+    mode_idx = cluster_modes(eig_vals, **opt_cluster, mode="global")
+    mode_eigens = np.array([eig_vals[np.argmax(mode_idx == mode_tmp)] 
+        for mode_tmp in range(mode_idx.max() + 1)])
+    mode_dist = np.meshgrid(mode_eigens, mode_eigens)
+    mode_dist = np.abs(mode_dist[0] - mode_dist[1])
+    np.fill_diagonal(mode_dist, np.max(mode_dist))
+    mode_dist = np.min(mode_dist, axis=1)
+    return mode_dist[mode_idx]
+
+
+def _intermodal_separation_sorted(eig_vals: np.ndarray, **opt_cluster) -> np.ndarray:
+    """Calculate intermodal separation for sorted eigenvalues
+    
+    See :py:func:`intermodal_separation` for parameter details
     
     .. note:: The input eigenvalue array should be already "sorted" in some ways,
         so that clustering only occurs for adjacent eigenvalues.
-        
-    .. [Boyd] Boyd, *Chebyshev and Fourier Spectral Methods*.
     """
-    mode_idx = cluster_modes(eig_vals, **opt_cluster)
+    mode_idx = cluster_modes(eig_vals, **opt_cluster, mode="sorted")
     mode_eigens = np.zeros(mode_idx.max() + 1, np.complex128)
     assert mode_eigens.size >= 1
     for i_eig, eig_tmp in enumerate(eig_vals):
@@ -380,7 +462,7 @@ def intermodal_separation(eig_vals: np.ndarray, **opt_cluster) -> np.ndarray:
 
     
 def eigen_drift(eig_base: np.ndarray, eig_comp: np.ndarray, waterlevel: float = 0., 
-    **opt_cluster):
+    mode: Literal["global", "sorted"] = "global", **opt_cluster):
     """Calculate eigenvalue drift ratio using Boyd's method ([Boyd]_)
     
     :param np.ndarray eig_base: eigenvalue array used as a base
@@ -394,7 +476,8 @@ def eigen_drift(eig_base: np.ndarray, eig_comp: np.ndarray, waterlevel: float = 
     
     .. note:: Be sure to pass in pre-sorted eigenvalues.
     """
-    eig_dist = intermodal_separation(eig_base, **opt_cluster)
+    eig_dist = intermodal_separation(eig_base, mode=mode, **opt_cluster)
+    # eig_dist = _intermodal_separation_sorted(eig_base, **opt_cluster)
     eig_diff, _ = np.meshgrid(eig_comp, eig_base, indexing='ij')
     eig_diff = np.abs(eig_diff - eig_base)
     eig_nearest_idx = np.argmin(eig_diff, axis=0)
