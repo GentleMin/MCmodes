@@ -1,0 +1,35 @@
+
+================================================================
+Calculating eigen spectrum for m = 3, E_eta = 1.00e-09, Elsasser =  1.00e+00
+
+
+----------------------------------------------------------------
+Resolution (L, N)=(33, 33)
+
+Build operator elapsed 2.31 s.
+DP system: 1950x1950
+Solve DP eigensystem elapsed 39.56 s.
+QP system: 1950x1950
+Solve QP eigensystem elapsed 43.04 s.
+
+----------------------------------------------------------------
+Resolution (L, N)=(43, 43)
+
+Build operator elapsed 3.74 s.
+DP system: 3400x3400
+Solve DP eigensystem elapsed 221.01 s.
+QP system: 3400x3400
+Solve QP eigensystem elapsed 205.14 s.
+
+----------------------------------------------------------------
+Resolution (L, N)=(63, 63)
+
+Build operator elapsed 13.30 s.
+DP system: 7500x7500
+Solve DP eigensystem elapsed 2770.71 s.
+QP system: 7500x7500
+Solve QP eigensystem elapsed 2680.59 s.
+
+Eigenvalue spectra saved to /cluster/home/jinmin/MCmodes/runs/T1pi_1e-9_m3_galerkin_60_parity-same/eigenspectra.h5
+================================================================
+
