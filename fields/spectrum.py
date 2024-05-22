@@ -168,7 +168,33 @@ class SpectralComponentSingleM(ABC):
         """
         field = self._physical_field(worland_transform, legendre_transform)
         return MeridionalSlice(field, self.m, worland_transform.r_grid, legendre_transform.grid)
-
+    
+    # def _laplacian(self, 
+    #     worland_transform: WorlandTransform,
+    #     legendre_transform: AssociatedLegendreTransformSingleM
+    # ) -> Dict[str, np.ndarray]:
+    #     """
+    #     """
+    #     m = self.m
+    #     maxnl = self.maxnl
+    #     nrg = worland_transform.r_grid.shape[0]
+    #     ntg = legendre_transform.grid.shape[0]
+    #     if self.component == 'tor':
+    #         radial = (worland_transform.operators['laplacianlW'] @ self.spectrum).reshape(-1, nrg)
+    #         r_comp = np.zeros((ntg, nrg))
+    #         theta_comp = 1.0j * m * legendre_transform._operators['plmdivsin'] @ radial
+    #         phi_comp = -legendre_transform._operators['dthetaplm'] @ radial
+    #     elif self.component == 'pol':
+    #         radial1 = (worland_transform.operators['divrW'] @ self.spectrum).reshape(-1, nrg)
+    #         radial2 = (worland_transform.operators['divrdiffrW'] @ self.spectrum).reshape(-1, nrg)
+    #         l_factor = scsp.diags([l * (l + 1) for l in range(m, maxnl)])
+    #         r_comp = legendre_transform._operators['plm'] @ l_factor @ radial1
+    #         theta_comp = legendre_transform._operators['dthetaplm'] @ radial2
+    #         phi_comp = 1.0j * m * legendre_transform._operators['plmdivsin'] @ radial2
+    #     else:
+    #         raise RuntimeError(f"Unknown component {self.component}, must be either 'pol' or 'tor'.")
+    #     return {'r': r_comp, 'theta': theta_comp, 'phi': phi_comp}
+    
     def cmb_slice(self,
                   ntg: int,
                   half_cmb: bool = True):
@@ -322,6 +348,22 @@ class SpectralComponentSingleM(ABC):
                 self.spectrum[a:b] = -poly.T @ weight @ lapl_poly.dot(self.spectrum[a:b])
             self.component = "tor"
         return self
+    
+    def laplacian(self):
+        """
+        Take Laplacian of the component
+        """
+        nr, maxnl, m = self.nr, self.maxnl, self.m
+        for l in range(m, maxnl):
+            n_grid = nr + maxnl // 2 + 10
+            rg = worland_grid(n_grid)
+            weight = scsp.diags(np.ones(n_grid)*worland_weight(n_grid))
+            wl = worland(nr, l, rg)
+            lapl_wl = laplacianlW(nr, l, rg)
+            idx_min, idx_max = (l - m)*nr, (l - m + 1)*nr
+            self.spectrum[idx_min:idx_max] = wl.T @ weight @ (lapl_wl @ self.spectrum[idx_min:idx_max])
+        
+        return self
 
     def restrict_parity(self, parity: str):
         """
@@ -453,6 +495,12 @@ class VectorFieldSingleM:
         new_tor = self.components["pol"]
         self.components = {"tor": new_tor, "pol": new_pol}
         return self
+    
+    def laplacian(self):
+        """Take Laplacian"""
+        self.components["tor"].laplacian()
+        self.components["pol"].laplacian()
+        return self
 
     def normalise(self, factor: float):
         for comp in self.components.keys():
@@ -538,6 +586,37 @@ class VectorFieldSingleM:
     @property
     def spectrum(self):
         return np.concatenate([self.components['tor'].spectrum, self.components['pol'].spectrum])
+    
+    def copy(self):
+        return VectorFieldSingleM(self.nr, self.maxnl, self.m, self.data.copy())
+
+
+def jwt(func: Callable[[np.ndarray,], np.ndarray], l: int, nr: int) -> np.ndarray:
+    """Jones-Worland (J-W) transfrom (physical -> spectral)
+    
+    Takes a function in spherical radius r to J-W spectrum, under
+    spherical harmonic (SH) degree l and maximum radial truncation nr.
+    Here the first index of the output of func is taken to be the index
+    of the spatial point where it is evaluated.
+    """
+    n_grid = nr + l // 2 + 10
+    r_grid = worland_grid(n_grid)
+    w_quad = scsp.diags(np.ones(n_grid)*worland_weight(n_grid))
+    W = worland(nr, l, r_grid)
+    return W.T @ w_quad @ func(r_grid)
+
+
+def ijwt(cf: np.ndarray, l: int, r_grid: np.ndarray) -> np.ndarray:
+    """Inverse Jones-Worland (J-W) transform (spectral -> physical)
+    
+    Takes J-W coefficients / spectrum under spherical harmonic (SH) 
+    degree l to values of the function in the physical domain.
+    Here the first index of cf (coefficient) is taken to indicate
+    polynomial degree 0, ... nr-1.
+    """
+    nr = cf.shape[0]
+    W = worland(nr, l, r_grid)
+    return W @ cf
 
 
 if __name__ == "__main__":
