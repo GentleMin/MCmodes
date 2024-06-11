@@ -6,7 +6,7 @@
 import numpy as np
 import gmpy2 as gp
 import mpmath as mp
-from typing import Union, List, Optional, Callable, Any, Literal
+from typing import Union, List, Tuple, Optional, Callable, Any, Literal
 from scipy.sparse import coo_array
 
 
@@ -311,6 +311,143 @@ def to_dense_gmpy2(gmpy2_array: coo_array, prec: int,
     """
     gmpy2_zero = gp.mpfr('0.0', prec) if mode == 'f' else gp.mpc('0.0+0.0j', prec)
     return to_dense_obj(gmpy2_array, gmpy2_zero)
+
+
+"""
+-----------------------------
+Coordinate transforms
+-----------------------------
+"""
+
+def is_shape_broadcastable(shape_1: tuple, shape_2: tuple) -> bool:
+    """Check if two shapes are compatible in broadcast
+    """
+    for dim1, dim2 in zip(shape_1[::-1], shape_2[::-1]):
+        if dim1 == 1 or dim2 == 1 or dim1 == dim2:
+            continue
+        else:
+            return False
+    return True
+
+
+def is_broadcastable(array_1: np.ndarray, array_2: np.ndarray) -> bool:
+    """Check if two arrays are compatible in broadcast
+    """
+    return is_shape_broadcastable(array_1.shape, array_2.shape)
+
+
+def coord_cart2cyl(
+    x: np.ndarray, y: np.ndarray, z: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Coordinate transform: Cartesian to cylindrical
+    """
+    assert is_broadcastable(x, y) and is_broadcastable(x, z), \
+        "Shapes {}, {}, {} incompatible".format(x.shape, y.shape, z.shape)
+    s = np.sqrt(x**2 + y**2)
+    p = np.arctan2(y, x)
+    return s, p, z
+
+
+def coord_cyl2cart(
+    s: np.ndarray, p: np.ndarray, z: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Coordinate transform: cylindrical to Cartesian
+    """
+    assert is_broadcastable(s, p) and is_broadcastable(s, z), \
+        "Shapes {}, {}, {} incompatible".format(s.shape, p.shape, z.shape)
+    x = s*np.cos(p)
+    y = s*np.sin(p)
+    return x, y, z
+
+
+def coord_cart2sph(
+    x: np.ndarray, y: np.ndarray, z: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Coordinate transform: Cartesian to spherical
+    """
+    assert is_broadcastable(x, y) and is_broadcastable(x, z), \
+        "Shapes {}, {}, {} incompatible".format(x.shape, y.shape, z.shape)
+    r = np.sqrt(x**2 + y**2 + z**2)
+    t = np.arccos(z/r)
+    p = np.arctan2(y, x)
+    return r, t, p
+
+
+def coord_sph2cart(
+    r: np.ndarray, t: np.ndarray, p: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Coordinate transform: Spherical to Cartesian
+    """
+    assert is_broadcastable(r, t) and is_broadcastable(r, p), \
+        "Shapes {}, {}, {} incompatible".format(r.shape, t.shape, p.shape)
+    z = r*np.cos(t)
+    s = r*np.sin(t)
+    x = s*np.cos(p)
+    y = s*np.sin(p)
+    return x, y, z
+
+
+def vector_cart2cyl(
+    vx: np.ndarray, vy: np.ndarray, vz: np.ndarray,
+    x: np.ndarray, y: np.ndarray, z: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Vector transform: Cartesian to cylindrical
+    """
+    assert is_broadcastable(vx, vy) and is_broadcastable(vx, vz), \
+        "Shapes {}, {}, {} incompatible".format(vx.shape, vy.shape, vz.shape)
+    s, p, _ = coord_cart2cyl(x, y, z)
+    c_p, s_p = np.cos(p), np.sin(p)
+    vs = vx*c_p + vy*s_p
+    vp = -vx*s_p + vy*c_p
+    return vs, vp, vz, s, p, z
+
+
+def vector_cyl2cart(
+    vs: np.ndarray, vp: np.ndarray, vz: np.ndarray,
+    s: np.ndarray, p: np.ndarray, z: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Vector transform: Cartesian to cylindrical
+    """
+    assert is_broadcastable(vs, vp) and is_broadcastable(vs, vz), \
+        "Shapes {}, {}, {} incompatible".format(vs.shape, vp.shape, vz.shape)
+    x, y, _ = coord_cyl2cart(s, p, z)
+    c_p, s_p = np.cos(p), np.sin(p)
+    vx = vs*c_p - vp*s_p
+    vy = vs*s_p + vp*c_p
+    return vx, vy, vz, x, y, z
+
+
+def vector_cart2sph(
+    vx: np.ndarray, vy: np.ndarray, vz: np.ndarray,
+    x: np.ndarray, y: np.ndarray, z: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Vector transform: Cartesian to spherical
+    """
+    assert is_broadcastable(vx, vy) and is_broadcastable(vx, vz), \
+        "Shapes {}, {}, {} incompatible".format(vx.shape, vy.shape, vz.shape)
+    vs, vp, _, s, p, _ = vector_cart2cyl(vx, vy, vz, x, y, z)
+    r = np.sqrt(s**2 + z**2)
+    t = np.arccos(z/r)
+    c_t, s_t = np.cos(t), np.sin(t)
+    vr = vz*c_t + vs*s_t
+    vt = -vz*s_t + vs*c_t
+    return vr, vt, vp, r, t, p
+
+
+def vector_sph2cart(
+    vr: np.ndarray, vt: np.ndarray, vp: np.ndarray,
+    r: np.ndarray, t: np.ndarray, p: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Vector transform: spherical to Cartesian
+    """
+    assert is_broadcastable(vr, vt) and is_broadcastable(vr, vp), \
+        "Shapes {}, {}, {} incompatible".format(vr.shape, vt.shape, vp.shape)
+    c_t, s_t = np.cos(t), np.sin(t)
+    s, z = r*s_t, r*c_t
+    vz = vr*c_t - vt*s_t
+    vs = -vr*s_t + vt*c_t
+    vx, vy, _, x, y, z = vector_cyl2cart(vs, vp, vz, s, p, z)
+    return vx, vy, vz, x, y, z
 
 
 """
