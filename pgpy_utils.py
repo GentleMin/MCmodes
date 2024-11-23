@@ -313,6 +313,74 @@ def to_dense_gmpy2(gmpy2_array: coo_array, prec: int,
     return to_dense_obj(gmpy2_array, gmpy2_zero)
 
 
+def tscale_convert(
+    in_tscale: Literal['rotation', 'Alfven', 'diffusion_mag', 'diffusion_mag_LJ2022'],
+    out_tscale: Literal['rotation', 'Alfven', 'diffusion_mag', 'diffusion_mag_LJ2022'],
+    **dimless_params
+):
+    """Conversion between dimensionless parameters with different time scales
+    """
+    if in_tscale == 'rotation':
+        Le = dimless_params.get('Lehnert')
+        Em = dimless_params.get('Ekman_mag')
+        Ek = dimless_params.get('Ekman', 0.)
+        if (Le is None) or (Em is None) or (Ek is None):
+            raise TypeError("Dimensionless params need to be specified.")
+        t_factor = 1.
+    
+    if in_tscale == 'Alfven':
+        Le = dimless_params.get('Lehnert')
+        Lu = dimless_params.get('Lundquist')
+        Pm = dimless_params.get('Prandtl_mag', 0.)
+        if (Le is None) or (Lu is None) or (Pm is None):
+            raise TypeError("Dimensionless params need to be specified.")
+        Em = Le/Lu
+        Ek = Pm*Em
+        t_factor = 1./Le
+    
+    if in_tscale == 'diffusion_mag':
+        Lambda = dimless_params.get('Elsasser')
+        Em = dimless_params.get('Ekman_mag')
+        Ek = dimless_params.get('Ekman', 0.)
+        if (Lambda is None) or (Em is None) or (Ek is None):
+            raise TypeError("Dimensionless params need to be specified.")
+        Le = np.sqrt(Em*Lambda)
+        t_factor = 1./Em
+    
+    if in_tscale == 'diffusion_mag_LJ2022':
+        Lambda = dimless_params.get('Elsasser')
+        Em = dimless_params.get('Ekman_mag')
+        Ek = dimless_params.get('Ekman', 0.)
+        if (Lambda is None) or (Em is None) or (Ek is None):
+            raise TypeError("Dimensionless params need to be specified.")
+        Le = 2*np.sqrt(Em*Lambda)
+        Em = 2*Em
+        Ek = 2*Ek
+        t_factor = 1./Em
+    
+    if out_tscale == 'rotation':
+        t_factor *= 1.
+        return t_factor, {'Lehnert': Le, 'Ekman_mag': Em, 'Ekman': Ek}
+    
+    if out_tscale == 'Alfven':
+        t_factor *= Le
+        Lu = Le/Em
+        Pm = Ek/Em
+        return t_factor, {'Lehnert': Le, 'Lundquist': Lu, 'Prandtl_mag': Pm}
+    
+    if out_tscale == 'diffusion_mag':
+        t_factor *= Em
+        Lambda = Em*Le**2
+        return t_factor, {'Elsasser': Lambda, 'Ekman_mag': Em, 'Ekman': Ek}
+    
+    if out_tscale == 'diffusion_mag_LJ2022':
+        t_factor *= Em
+        Lambda = Em*Le**2/2
+        Em /= 2
+        Ek /= 2
+        return t_factor, {'Elsasser': Lambda, 'Ekman_mag': Em, 'Ekman': Ek}
+        
+
 """
 -----------------------------
 Coordinate transforms
