@@ -337,6 +337,25 @@ class MagnetoCoriolis_Alfven(MagnetoCoriolis):
                    self.separate_parity(A, B, b_parity='QP', u_parity=self.u_parity('QP', kwargs.get('u_parity')))
         else:
             return A, B
+        
+        
+class MagnetoCoriolis_Spin(MagnetoCoriolis):
+    
+    def setup_eigen_problem(self, operators, **kwargs):
+        Le = kwargs.get('lehnert')
+        E_eta = kwargs.get('magnetic_ekman')
+        U = kwargs.get('U', 0)
+        B = scsp.block_diag((operators['momentum_mass'], operators['induction_mass']))
+        A = scsp.bmat(
+            [[-U * operators['advection'] - 2*operators['coriolis'], Le**2*operators['lorentz']],
+             [operators['inductionB'], U * operators['inductionU'] + E_eta*operators['magnetic_diffusion']]
+             ])
+        # separate parity
+        if kwargs.get('parity', False):
+            return self.separate_parity(A, B, b_parity='DP', u_parity=self.u_parity('DP', kwargs.get('u_parity'))), \
+                   self.separate_parity(A, B, b_parity='QP', u_parity=self.u_parity('QP', kwargs.get('u_parity')))
+        else:
+            return A, B
 
 
 class IdealMagnetoCoriolis(MagnetoCoriolis):

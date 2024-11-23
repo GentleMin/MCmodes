@@ -322,10 +322,10 @@ class SphericalHarmonicMode:
         self.m = m
         if isinstance(radial_func, str):
             self.radial_expr = parse_mathematica(radial_func)
-            self.radial_func = lambdify(r, self.radial_expr, "numpy")
+            self.radial_func = lambdify(r, self.radial_expr, ["numpy", "scipy"])
         else:
             self.radial_expr = radial_func
-            self.radial_func = lambdify(r, self.radial_expr, "numpy")
+            self.radial_func = lambdify(r, self.radial_expr, ["numpy", "scipy"])
 
     def curl(self):
         if self.comp == "tor":
