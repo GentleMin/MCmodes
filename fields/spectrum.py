@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict, Callable
+from typing import List, Tuple, Dict, Callable, Union
 
 import numpy as np
 
@@ -8,6 +8,7 @@ from operators.associated_legendre_transform import AssociatedLegendreTransformS
 from fields.physical import MeridionalSlice, EquatorialSlice, CMBSlice
 from operators.polynomials import *
 from utils import *
+from typing import Optional
 
 
 class _SpectrumOrderingBase(ABC):
@@ -94,6 +95,19 @@ class SpectralComponentSingleM(ABC):
         for l, n, value in modes:
             data[ordering.index(l, n)] = value
         return cls(nr, maxnl, m, component, data)
+    
+    @classmethod
+    def from_SH_mode(cls, nr: int, maxnl: int, SH_mode: SphericalHarmonicMode):
+        """Construct single m field from single SH mode
+        """
+        m = SH_mode.m
+        comp = SH_mode.comp
+        ordering = SpectrumOrderingSingleM(nr, maxnl, m)
+        data = np.zeros((ordering.dim,), dtype=np.complex128)
+        i_start = ordering.index(SH_mode.l, 0)
+        i_end = ordering.index(SH_mode.l+1, 0)
+        data[i_start:i_end] = jwt(SH_mode.radial_func, SH_mode.l, nr)
+        return cls(nr, maxnl, m, comp, data)
 
     @classmethod
     def from_parity_spectrum(cls, nr, maxnl, m,
@@ -190,6 +204,120 @@ class SpectralComponentSingleM(ABC):
         legendre_transform = AssociatedLegendreTransformSingleM(self.maxnl, self.m, np.array([np.pi/2]))
         field = self._physical_field(worland_transform, legendre_transform)
         return EquatorialSlice(field, self.m, worland_transform.r_grid)
+
+    def evaluate(
+        self, r: np.ndarray, theta: np.ndarray, phi: Union[np.ndarray, float], 
+        trans_worland: Optional[WorlandTransform] = None,
+        trans_legendre: Optional[AssociatedLegendreTransformSingleM] = None
+    ):
+        """Evaluate the field on unstructured grid
+        Slower than e.g. 'physical_field', but more flexible
+        """
+        assert r.ndim == 1
+        assert r.shape == theta.shape
+        if isinstance(phi, np.ndarray):
+            assert r.shape == phi.shape
+        
+        m, maxnl, nr = self.m, self.maxnl, self.nr
+        if trans_worland is None:
+            trans_worland = WorlandTransform(nr, maxnl, m, r_grid=r)
+        if trans_legendre is None:
+            trans_legendre = AssociatedLegendreTransformSingleM(maxnl, m, grid=theta)
+        
+        if self.component == "tor":
+            radial = (trans_worland.operators['W'] @ self.spectrum).reshape(-1, r.size)
+            r_comp = np.zeros(r.shape)
+            t_comp = 1.0j*m*np.sum(trans_legendre.operators['plmdivsin'].T*radial, axis=0)
+            p_comp = -np.sum(trans_legendre.operators['dthetaplm'].T*radial, axis=0)
+            phase = np.exp(1j*self.m*phi)
+            t_comp *= phase
+            p_comp *= phase
+        elif self.component == "pol":
+            radial1 = (trans_worland.operators['divrW'] @ self.spectrum).reshape(-1, r.size)
+            radial2 = (trans_worland.operators['divrdiffrW'] @ self.spectrum).reshape(-1, r.size)
+            # l_factor = scsp.diags([l * (l + 1) for l in range(m, maxnl)])
+            l_factor = np.array([l * (l + 1) for l in range(m, maxnl)]).reshape(-1, 1)
+            r_comp = np.sum(l_factor*(trans_legendre.operators['plm'].T*radial1), axis=0)
+            t_comp = np.sum(trans_legendre.operators['dthetaplm'].T*radial2, axis=0)
+            p_comp = 1.0j*m*np.sum(trans_legendre.operators['plmdivsin'].T*radial2, axis=0)
+            phase = np.exp(1j*self.m*phi)
+            r_comp *= phase
+            t_comp *= phase
+            p_comp *= phase
+        else:
+            raise RuntimeError(f"Unknown component {self.component}, must be either 'pol' or 'tor'.")
+        return {'r': r_comp, 'theta': t_comp, 'phi': p_comp}
+    
+    def eval_diff(
+        self, r: np.ndarray, theta: np.ndarray, phi: Union[np.ndarray, float], 
+        trans_worland: Optional[WorlandTransform] = None,
+        trans_legendre: Optional[AssociatedLegendreTransformSingleM] = None
+    ):
+        """Evaluate derivative of components
+        Note, these are not components of tensor gradient, but derivative of vector components!
+        """
+        assert r.ndim == 1
+        assert r.shape == theta.shape
+        if isinstance(phi, np.ndarray):
+            assert r.shape == phi.shape
+        
+        m, maxnl, nr = self.m, self.maxnl, self.nr
+        if trans_worland is None:
+            trans_worland = WorlandTransform(nr, maxnl, m, r_grid=r)
+        if trans_legendre is None:
+            trans_legendre = AssociatedLegendreTransformSingleM(maxnl, m, grid=theta)
+        
+        c_t, s_t = np.cos(theta), np.sin(theta)
+        d_comp = dict()
+        
+        if self.component == "tor":
+            
+            W = (trans_worland.operators['W'] @ self.spectrum).reshape(-1, r.size)
+            W_r = (trans_worland.operators['divrW'] @ self.spectrum).reshape(-1, r.size)
+            dr_rW_r = (trans_worland.operators['divrdiffrW'] @ self.spectrum).reshape(-1, r.size)
+            Plm = trans_legendre.operators['plm'].T
+            Plm_s = trans_legendre.operators['plmdivsin'].T
+            dt_Plm = trans_legendre.operators['dthetaplm'].T
+            dt2_Plm = trans_legendre.operators['dtheta2plm'].T
+
+            d_comp['dr_vr'] = 0.
+            d_comp['dr_vt'] = 1j*m*np.sum(Plm_s*(dr_rW_r - W/r), axis=0)
+            d_comp['dr_vp'] = -np.sum(dt_Plm*(dr_rW_r - W/r), axis=0)
+            d_comp['dt_vr'] = 0.
+            d_comp['dt_vt'] = 1j*m*np.sum((dt_Plm - c_t*Plm_s)*W, axis=0)/s_t
+            d_comp['dt_vp'] = -np.sum(dt2_Plm*W, axis=0)
+            d_comp['dp_vr'] = 0.
+            d_comp['dp_vt'] = -m**2*np.sum(Plm_s*W, axis=0)
+            d_comp['dp_vp'] = -1j*m*np.sum(dt_Plm*W, axis=0)
+        
+        elif self.component == "pol":
+            
+            l_factor = np.array([l * (l + 1) for l in range(m, maxnl)]).reshape(-1, 1)
+            W_r = (trans_worland.operators['divrW'] @ self.spectrum).reshape(-1, r.size)
+            dr_rW_r = (trans_worland.operators['divrdiffrW'] @ self.spectrum).reshape(-1, r.size)
+            dr2_rW = (trans_worland.operators['diff2rW'] @ self.spectrum).reshape(-1, r.size)
+            Plm = trans_legendre.operators['plm'].T
+            Plm_s = trans_legendre.operators['plmdivsin'].T
+            dt_Plm = trans_legendre.operators['dthetaplm'].T
+            dt2_Plm = trans_legendre.operators['dtheta2plm'].T
+            
+            d_comp['dr_vr'] = np.sum(l_factor*Plm*(dr_rW_r - 2*W_r), axis=0)/r
+            d_comp['dr_vt'] = np.sum(dt_Plm*(dr2_rW - dr_rW_r), axis=0)/r
+            d_comp['dr_vp'] = 1j*m*np.sum(Plm_s*(dr2_rW - dr_rW_r), axis=0)/r
+            d_comp['dt_vr'] = np.sum(l_factor*dt_Plm*W_r, axis=0)
+            d_comp['dt_vt'] = np.sum(dt2_Plm*dr_rW_r, axis=0)
+            d_comp['dt_vp'] = 1j*m*np.sum((dt_Plm - c_t*Plm_s)*dr_rW_r, axis=0)/s_t
+            d_comp['dp_vr'] = 1j*m*np.sum(l_factor*Plm*W_r, axis=0)
+            d_comp['dp_vt'] = 1j*m*np.sum(dt_Plm*dr_rW_r, axis=0)
+            d_comp['dp_vp'] = -m**2*np.sum(Plm_s*dr_rW_r, axis=0)
+        
+        else:
+            raise RuntimeError(f"Unknown component {self.component}, must be either 'pol' or 'tor'.")
+        
+        phase = np.exp(1j*m*phi)
+        for key in d_comp:
+            d_comp[key] *= phase
+        return d_comp
 
     def cylindrical_integration(self,
                                 sg: np.ndarray,
@@ -322,6 +450,22 @@ class SpectralComponentSingleM(ABC):
                 self.spectrum[a:b] = -poly.T @ weight @ lapl_poly.dot(self.spectrum[a:b])
             self.component = "tor"
         return self
+    
+    def laplacian(self):
+        """
+        Take Laplacian of the component
+        """
+        nr, maxnl, m = self.nr, self.maxnl, self.m
+        for l in range(m, maxnl):
+            n_grid = nr + maxnl // 2 + 10
+            rg = worland_grid(n_grid)
+            weight = scsp.diags(np.ones(n_grid)*worland_weight(n_grid))
+            wl = worland(nr, l, rg)
+            lapl_wl = laplacianlW(nr, l, rg)
+            idx_min, idx_max = (l - m)*nr, (l - m + 1)*nr
+            self.spectrum[idx_min:idx_max] = wl.T @ weight @ (lapl_wl @ self.spectrum[idx_min:idx_max])
+        
+        return self
 
     def restrict_parity(self, parity: str):
         """
@@ -401,6 +545,18 @@ class VectorFieldSingleM:
         nr, maxnl, m = tor.ordering.res
         data = np.concatenate([tor.spectrum, pol.spectrum])
         return cls(nr, maxnl, m, data)
+    
+    @classmethod
+    def from_SH_mode(cls, nr: int, maxnl: int, SH_mode: SphericalHarmonicMode):
+        """Construct single m vector field from single SH mode
+        """
+        field_comp = SpectralComponentSingleM.from_SH_mode(nr, maxnl, SH_mode)
+        m = field_comp.m
+        if field_comp.component == "tor":
+            data = np.concatenate([field_comp.data, np.zeros_like(field_comp.data)])
+        else:
+            data = np.concatenate([np.zeros_like(field_comp.data), field_comp.data])
+        return cls(nr, maxnl, m, data)
 
     @classmethod
     def from_parity_spectrum(cls, nr, maxnl, m,
@@ -416,6 +572,42 @@ class VectorFieldSingleM:
         coe[toridx] = data[:len(toridx)]
         coe[polidx] = data[len(toridx):]
         return cls(nr, maxnl, m, coe)
+    
+    def __add__(self, v: "VectorFieldSingleM") -> "VectorFieldSingleM":
+        """Add two vector fields of single m together
+        """
+        assert self.m == v.m, "Azimuthal wavenumber incompatible!"
+        if self.nr == v.nr and self.maxnl == v.maxnl:
+            return VectorFieldSingleM(self.nr, self.maxnl, self.m, self.data + v.data)
+        else:
+            nr = max([self.nr, v.nr])
+            maxnl = max([self.maxnl, v.maxnl])
+            m = self.m
+            ordering = SpectrumOrderingSingleM(nr, maxnl, m)
+            ordering_u = SpectrumOrderingSingleM(self.nr, self.maxnl, m)
+            ordering_v = SpectrumOrderingSingleM(v.nr, v.maxnl, m)
+            data_tor = np.zeros((ordering.dim,), dtype=np.complex128)
+            data_pol = np.zeros((ordering.dim,), dtype=np.complex128)
+            for l in range(maxnl):
+                if l < self.maxnl:
+                    i_l = ordering.index(l, 0)
+                    i_l_u = ordering_u.index(l, 0)
+                    data_tor[i_l:i_l+self.nr] += self.components["tor"].data[i_l_u:i_l_u+self.nr]
+                    data_pol[i_l:i_l+self.nr] += self.components["pol"].data[i_l_u:i_l_u+self.nr]
+                if l < v.maxnl:
+                    i_l = ordering.index(l, 0)
+                    i_l_v = ordering_v.index(l, 0)
+                    data_tor[i_l:i_l+v.nr] += v.components["tor"].data[i_l_v:i_l_v+v.nr]
+                    data_pol[i_l:i_l+v.nr] += v.components["pol"].data[i_l_v:i_l_v+v.nr]
+            return VectorFieldSingleM(nr, maxnl, m, np.r_[data_tor, data_pol])
+    
+    def __radd__(self, v: "VectorFieldSingleM") -> "VectorFieldSingleM":
+        """Right add
+        """
+        if v == 0:
+            return self
+        else:
+            return self.__add__(v)
 
     def physical_field(self,
                        worland_transform: WorlandTransform,
@@ -444,6 +636,27 @@ class VectorFieldSingleM:
         """
         return self.components["tor"].equatorial_slice(worland_transform) + \
                self.components["pol"].equatorial_slice(worland_transform)
+    
+    def evaluate(self, r, theta, phi, trans_worland=None, trans_legendre=None):
+        """Evaluate the field on unstructured grid
+        Slower than e.g. 'physical_field', but more flexible
+        """
+        feval_tor = self.components["tor"].evaluate(r, theta, phi, trans_worland=trans_worland, trans_legendre=trans_legendre)
+        feval_pol = self.components["pol"].evaluate(r, theta, phi, trans_worland=trans_worland, trans_legendre=trans_legendre)
+        feval = {
+            'r': feval_tor['r'] + feval_pol['r'],
+            'theta': feval_tor['theta'] + feval_pol['theta'],
+            'phi': feval_tor['phi'] + feval_pol['phi'],
+        }
+        return feval
+    
+    def eval_diff(self, r, theta, phi, trans_worland=None, trans_legendre=None):
+        """Evaluate derivative of components
+        """
+        d_comp_tor = self.components['tor'].eval_diff(r, theta, phi, trans_worland=trans_worland, trans_legendre=trans_legendre)
+        d_comp_pol = self.components['pol'].eval_diff(r, theta, phi, trans_worland=trans_worland, trans_legendre=trans_legendre)
+        d_comp = {key: d_comp_tor[key] + d_comp_pol[key] for key in d_comp_tor}
+        return d_comp
 
     def curl(self):
         """ Transform to curl of the field """
@@ -452,6 +665,12 @@ class VectorFieldSingleM:
         new_pol = self.components["tor"]
         new_tor = self.components["pol"]
         self.components = {"tor": new_tor, "pol": new_pol}
+        return self
+    
+    def laplacian(self):
+        """Take Laplacian"""
+        self.components["tor"].laplacian()
+        self.components["pol"].laplacian()
         return self
 
     def normalise(self, factor: float):
@@ -538,6 +757,37 @@ class VectorFieldSingleM:
     @property
     def spectrum(self):
         return np.concatenate([self.components['tor'].spectrum, self.components['pol'].spectrum])
+    
+    def copy(self):
+        return VectorFieldSingleM(self.nr, self.maxnl, self.m, self.data.copy())
+
+
+def jwt(func: Callable[[np.ndarray,], np.ndarray], l: int, nr: int) -> np.ndarray:
+    """Jones-Worland (J-W) transfrom (physical -> spectral)
+    
+    Takes a function in spherical radius r to J-W spectrum, under
+    spherical harmonic (SH) degree l and maximum radial truncation nr.
+    Here the first index of the output of func is taken to be the index
+    of the spatial point where it is evaluated.
+    """
+    n_grid = nr + l // 2 + 10
+    r_grid = worland_grid(n_grid)
+    w_quad = scsp.diags(np.ones(n_grid)*worland_weight(n_grid))
+    W = worland(nr, l, r_grid)
+    return W.T @ w_quad @ func(r_grid)
+
+
+def ijwt(cf: np.ndarray, l: int, r_grid: np.ndarray) -> np.ndarray:
+    """Inverse Jones-Worland (J-W) transform (spectral -> physical)
+    
+    Takes J-W coefficients / spectrum under spherical harmonic (SH) 
+    degree l to values of the function in the physical domain.
+    Here the first index of cf (coefficient) is taken to indicate
+    polynomial degree 0, ... nr-1.
+    """
+    nr = cf.shape[0]
+    W = worland(nr, l, r_grid)
+    return W @ cf
 
 
 if __name__ == "__main__":

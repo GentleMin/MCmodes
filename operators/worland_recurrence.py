@@ -60,18 +60,27 @@ def divrW(nr, l, rg):
             divrw[:, n] *= wb.worland_norm(n, l)
         return divrw
     else:
+        # This only happens when a derivative is taken on the l=0, m=0 component
+        # in this case, the angular part should always yield zero; it is in general
+        # safe to direct return zero, also to avoid singularity at rg=0
         return np.zeros((rg.shape[0], nr))
 
 
 def divrdiffrW(nr, l, rg):
     """1/r D r W(r) """
-    a, b = -0.5, l-0.5
-    p = jacobiP(nr, a, b, 2*rg**2-1, (l+1)*rg**(l-1))
-    dp = DjacobiP(nr, a, b, 2*rg**2-1, 4*rg**(l+1))
-    divrdiffrw = p + dp
-    for n in range(nr):
-        divrdiffrw[:, n] *= wb.worland_norm(n, l)
-    return divrdiffrw
+    if l >= 1:
+        a, b = -0.5, l-0.5
+        p = jacobiP(nr, a, b, 2*rg**2-1, (l+1)*rg**(l-1))
+        dp = DjacobiP(nr, a, b, 2*rg**2-1, 4*rg**(l+1))
+        divrdiffrw = p + dp
+        for n in range(nr):
+            divrdiffrw[:, n] *= wb.worland_norm(n, l)
+        return divrdiffrw
+    else:
+        # This only happens when a derivative is taken on the l=0, m=0 component
+        # in this case, the angular part should always yield zero; it is in general
+        # safe to direct return zero, also to avoid singularity at rg=0
+        return np.zeros((rg.shape[0], nr))
 
 
 def diff2rW(nr, l, rg):

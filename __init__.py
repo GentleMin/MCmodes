@@ -1,1 +1,2 @@
-from QuICC.Python import quicc
+# from QuICC.Python import quicc
+import quicc

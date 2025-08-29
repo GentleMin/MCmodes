@@ -1,0 +1,20 @@
+========================================================
+List of "converged" eigenvalues at L=N=63
+========================================================
+Index   Value                       Type                        Radial-k[Us(Up-1)]
+mdk1    -0.01063483+8.2193675e-4j   unknown                     NA
+mdk2    -0.00939095+9.2441255e-4j   unknown                     NA
+mch2    -0.00209074+0.00093502j     columnar-MC?/hybrid         2,2
+mch4a   -0.00375795+0.0018705j      columnar-MC?/hybrid         3,4
+mch4b   -0.00472351+0.00270383j     columnar-MC?/hybrid         3,4
+mch5a   -0.00809372+0.00633951j     columnar-MC?/hybrid         4,5
+mch5b   -0.00825738+0.00607964j     columnar-MC?/hybrid         6,5
+mh3a    -0.01111054+0.00939048j     hybrid-MC                   3?,3?
+mh3b    -0.01388555+0.01013982j     hybrid-MC                   3?,3?
+mn7     -0.02036129+0.01971255j     non-columnar                NA
+mc8     -0.0265417+0.03318219j      columnar-MC                 8/9,8
+mc9     -0.03585122+0.05098129j     columnar-MC                 9/10,9
+mc10    -0.04745258+0.07485331j     columnar-MC                 10,10
+mc11    -0.06264864+0.10584413j     columnar-MC_c-              11,11
+mc14    -0.11187571+0.22288023j     columnar-MC_c-              12,14
+i5      -0.00045322-256.49643341j   columnar-inertial           5,5

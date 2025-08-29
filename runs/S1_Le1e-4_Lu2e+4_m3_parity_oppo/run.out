@@ -1,0 +1,26 @@
+
+================================================================
+Calculating eigen spectrum for m = 3, Le = 1.00e-04, Lu =  2.00e+04
+
+
+----------------------------------------------------------------
+Resolution (L, N)=(43, 43)
+
+Build operator elapsed 4.02 s.
+DP system: 3440x3440
+Solve DP eigensystem elapsed 212.85 s.
+QP system: 3440x3440
+Solve QP eigensystem elapsed 212.48 s.
+
+----------------------------------------------------------------
+Resolution (L, N)=(63, 63)
+
+Build operator elapsed 13.11 s.
+DP system: 7560x7560
+Solve DP eigensystem elapsed 2638.57 s.
+QP system: 7560x7560
+Solve QP eigensystem elapsed 2522.06 s.
+
+Eigenvalue spectra saved to /cluster/home/jinmin/MCmodes/runs/S1_Le1e-4_Lu2e+4_m3_parity_oppo/eigenspectra.h5
+================================================================
+

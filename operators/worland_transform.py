@@ -33,6 +33,7 @@ class WorlandTransform:
     m: int
     n_grid: int = None
     r_grid: np.ndarray = field(repr=False, default=None)
+    require_diff: bool = True
     require_curl: bool = True
 
     def __post_init__(self):
@@ -56,17 +57,18 @@ class WorlandTransform:
         self.operators = {}
         self.transformers = {}
         self.operators['W'] = []
-        self.operators['divrW'] = []
-        self.operators['divrdiffrW'] = []
-        self.operators['diff2rW'] = []
-        self.operators['laplacianlW'] = []
         for l in range(m, maxnl):
-            mat = worland(nr, l, r_grid)
-            self.operators['W'].append(mat)
-            self.operators['divrW'].append(divrW(nr, l, r_grid))
-            self.operators['divrdiffrW'].append(divrdiffrW(nr, l, r_grid))
-            self.operators['diff2rW'].append(diff2rW(nr, l, r_grid))
-            self.operators['laplacianlW'].append(laplacianlW(nr, l, r_grid))
+            self.operators['W'].append(worland(nr, l, r_grid))
+        if self.require_diff:
+            self.operators['divrW'] = []
+            self.operators['divrdiffrW'] = []
+            self.operators['diff2rW'] = []
+            self.operators['laplacianlW'] = []
+            for l in range(m, maxnl):
+                self.operators['divrW'].append(divrW(nr, l, r_grid))
+                self.operators['divrdiffrW'].append(divrdiffrW(nr, l, r_grid))
+                self.operators['diff2rW'].append(diff2rW(nr, l, r_grid))
+                self.operators['laplacianlW'].append(laplacianlW(nr, l, r_grid))
         for k, v in self.operators.items():
             self.operators[k] = scsp.csc_matrix(scsp.block_diag(v))
 
