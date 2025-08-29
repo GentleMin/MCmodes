@@ -20,6 +20,10 @@ class AssociatedLegendreTransformSingleM(ABC):
         self._operators['dthetaplm'] = DthetaPlm(self.m, self.maxnl - 1, self._operators['plm'],
                                                  self._operators['plmdivsin'], self.grid)
         self._operators['plmdivsin'] = self._operators['plmdivsin'][:, :-1]
+        c_t, s_t = np.cos(self.grid).reshape(-1, 1), np.sin(self.grid).reshape(-1, 1)
+        l_factor = np.array([l*(l + 1) for l in range(self.m, self.maxnl)])
+        self._operators['dtheta2plm'] = (self.m**2*self._operators['plmdivsin'] - c_t*self._operators['dthetaplm'])/s_t \
+            - l_factor*self._operators['plm']
 
     @property
     def operators(self):

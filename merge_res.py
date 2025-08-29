@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Merge files with different resolutions
 """
-import h5py
+import os, h5py
 import tools
 
 

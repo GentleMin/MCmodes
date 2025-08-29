@@ -713,3 +713,12 @@ def spec_tail_exp_rate(spectrum: np.ndarray):
     return np.min(tail_exp_rate, axis=0)
 
 
+def decimal_decomp(x: float, dig: int = 16):
+    str_float = '{:.16e}'.format(x)
+    str_float = str_float.split('e')
+    cf = float(str_float[0])
+    base = int(str_float[1])
+    if np.abs(cf) >= 10:
+        cf /= 10
+        base += 1
+    return cf, base
