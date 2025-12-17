@@ -394,7 +394,7 @@ class SpectralComponentSingleM(ABC):
 
     @staticmethod
     def _Wtransform(spectrum, nr, maxnl, m, rg):
-        radial = np.full((maxnl-m, rg.shape[0]), fill_value=np.NaN, dtype=np.complex128)
+        radial = np.full((maxnl-m, rg.shape[0]), fill_value=np.nan, dtype=np.complex128)
         for l in range(m, maxnl):
             poly = worland(nr, l, rg)
             a, b = (l-m)*nr, (l-m+1)*nr
@@ -403,7 +403,7 @@ class SpectralComponentSingleM(ABC):
 
     @staticmethod
     def _divrWtransform(spectrum, nr, maxnl, m, rg):
-        radial = np.full((maxnl - m, rg.shape[0]), fill_value=np.NaN, dtype=np.complex128)
+        radial = np.full((maxnl - m, rg.shape[0]), fill_value=np.nan, dtype=np.complex128)
         for l in range(m, maxnl):
             poly = divrW(nr, l, rg)
             a, b = (l - m) * nr, (l - m + 1) * nr
@@ -412,7 +412,7 @@ class SpectralComponentSingleM(ABC):
 
     @staticmethod
     def _divrdiffrWtransform(spectrum, nr, maxnl, m, rg):
-        radial = np.full((maxnl - m, rg.shape[0]), fill_value=np.NaN, dtype=np.complex128)
+        radial = np.full((maxnl - m, rg.shape[0]), fill_value=np.nan, dtype=np.complex128)
         for l in range(m, maxnl):
             poly = divrdiffrW(nr, l, rg)
             a, b = (l - m) * nr, (l - m + 1) * nr
@@ -421,7 +421,7 @@ class SpectralComponentSingleM(ABC):
 
     @staticmethod
     def _laplacianlWtransform(spectrum, nr, maxnl, m, rg):
-        radial = np.full((maxnl - m, rg.shape[0]), fill_value=np.NaN, dtype=np.complex128)
+        radial = np.full((maxnl - m, rg.shape[0]), fill_value=np.nan, dtype=np.complex128)
         for l in range(m, maxnl):
             poly = laplacianlW(nr, l, rg)
             a, b = (l - m) * nr, (l - m + 1) * nr

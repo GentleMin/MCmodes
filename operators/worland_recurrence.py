@@ -6,7 +6,7 @@ import quicc.geometry.worland.worland_basis as wb
 
 @njit
 def jacobiP(nr, a, b, x, coe):
-    w = np.full((x.shape[0], nr), fill_value=np.NaN)
+    w = np.full((x.shape[0], nr), fill_value=np.nan)
     w[:, 0] = coe
     if nr > 1:
         w[:, 1] = 0.5 * coe * (a-b+(2+a+b)*x)

@@ -2,6 +2,9 @@
 figures/
 docs/
 
+# Mathematica notebooks
+*.nb
+
 # Other files and folders
 .settings/
 __pycache__/
