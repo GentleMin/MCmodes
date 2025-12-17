@@ -51,11 +51,20 @@ mode_poly_terms_cyl = {
         (m + (2*j + m)*sigma)*sigma**(2*i) * (1 - sigma**2)**(j - 1) * s**(m + 2*j - 1) * z**(2*i),
         (m + 2*j + m*sigma)*sigma**(2*i) * (1 - sigma**2)**(j - 1) * s**(m + 2*j - 1) * z**(2*i),
         2*i*sigma**(2*i - 1) * (1 - sigma**2)**j * s**(m + 2*j) * z**(2*i - 1),
+    ],
+    'a': [
+        (m + (2*j + m)*sigma)*sigma**(2*i) * (1 - sigma**2)**(j - 1) * s**(m + 2*j - 1) * z**(2*i+1),
+        (m + 2*j + m*sigma)*sigma**(2*i) * (1 - sigma**2)**(j - 1) * s**(m + 2*j - 1) * z**(2*i + 1),
+        (2*i + 1)*sigma**(2*i - 1) * (1 - sigma**2)**j * s**(m + 2*j) * z**(2*i),
     ]
+}
+mode_p_terms_cyl = {
+    's': sigma**(2*i) * (1 - sigma**2)**j * s**(m + 2*j) * z**(2*i),
+    'a': sigma**(2*i) * (1 - sigma**2)**j * s**(m + 2*j) * z**(2*i + 1)
 }
 
 
-def eigenfreq_inviscid(N_val, m_val, parity='s', sort=True, **solve_kwargs):
+def eigenfreq_inviscid(N_val, m_val, parity='s', sort=True, filter_zero=True, **solve_kwargs):
     """Calculate eigenfrequencies of the inviscid inertial modes in unit sphere
     """
     poly = eigenfreq_polys[parity]
@@ -63,6 +72,7 @@ def eigenfreq_inviscid(N_val, m_val, parity='s', sort=True, **solve_kwargs):
     roots = sym.nroots(poly, **solve_kwargs)
     eigenfreqs = 2*np.array(roots)
     eigenfreqs = eigenfreqs[np.argsort(np.abs(eigenfreqs))]
+    eigenfreqs = eigenfreqs[np.abs(eigenfreqs) > 1e-7]
     return eigenfreqs
 
 
@@ -98,6 +108,13 @@ def which_eigenfreq(freq_0, Ns, ms):
     return m, n, k, parity, freq
 
 
+def code_convert(m, n, k, X=None):
+    if X is None:
+        return m, (n - m) // 2, k, 'S' if (n - m)%2 == 0 else 1
+    else:
+        iX = 0 if X == 'S' else 1
+        return m, m + 2*n + iX, k
+
 def eigenmode_poly_inviscid(N_val, parity='s'):
     u_s = -sym.I*sym.Add(*[
         (mode_poly_cfs[parity]*mode_poly_terms_cyl[parity][0]).subs({N: N_val, i: i_val, j: j_val}) 
@@ -112,6 +129,25 @@ def eigenmode_poly_inviscid(N_val, parity='s'):
         for i_val in range(N_val + 1) for j_val in range(N_val - i_val + 1)
     ])
     return u_s, u_p, u_z
+
+
+def pressure_mode_invisicid(N_val, parity='s'):
+    p_mode = sym.Add(*[
+        (mode_poly_cfs[parity]*mode_p_terms_cyl[parity]).subs({N: N_val, i: i_val, j: j_val})
+        for i_val in range(N_val + 1) for j_val in range(N_val - i_val + 1)
+    ])
+    return p_mode
+
+
+def transform_SH(vr_func, Ntrunc: int, m_val: int): 
+    """
+    """
+    xi, _ = specfun.roots_chebyt(2*Ntrunc)
+    Pmn_vals = [specfun.lpmn(m_val, Ntrunc, xi_tmp) for xi_tmp in xi]
+    Pmn = np.stack([Pmn_tmp[0][m_val, m_val:] for Pmn_tmp in Pmn_vals], axis=0)
+    vr_vals = vr_func(np.arccos(xi))*np.ones_like(xi)
+    c_SH = np.linalg.solve(Pmn.T @ Pmn, Pmn.T @ vr_vals)
+    return c_SH
 
 
 def rad2tan_B_single_m(Br_func, Ntrunc: int, m_val: int):
@@ -197,7 +233,7 @@ def eigenfreq_Rossby_to_Malkus(
             \\omega = \\frac{\\omega_0}{2} 
             \\left(1 \\pm \\sqrt{\\mathrm{Le}^2 \\frac{4m(m - \\omega_0)}{\\omega_0^2}}\\right)
         
-        When using Alfven time scale, i.e. :math:`\\tau=\\frac{\\sqrt{\\rho\mu_0}L}{B}`
+        When using Alfven time scale, i.e. :math:`\\tau=\\frac{\\sqrt{\\rho\\mu_0}L}{B}`
         
         .. math::
         
@@ -231,5 +267,7 @@ def eigenfreq_Rossby_to_Malkus(
 
 if __name__ == '__main__':
     
-    eigenfreqs = eigenfreq_inviscid(4, 3, parity='s')
+    # eigenfreqs = eigenfreq_inviscid(1, 3, parity='a')
+    # eigenfreqs = np.array([eigenfreq_inviscid(n, 3, parity='a')[0] for n in range(10)])
+    eigenfreqs = np.array([eigenfreq_inviscid(n, 3, parity='s')[1] for n in range(1, 10)])
     print(eigenfreqs)

@@ -5,6 +5,9 @@ docs/
 # Mathematica notebooks
 *.nb
 
+# Test file
+test.py
+
 # Other files and folders
 .settings/
 __pycache__/

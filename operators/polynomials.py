@@ -249,12 +249,18 @@ def Plm(m, lmax, theta):
 
     if lmax == m:
         C = np.exp(-0.5 * special.loggamma(2 * m + 1)) * np.sqrt((2. * m + 1.) / (4. * np.pi))
-        val = C * (-1.) ** m * special.factorial2(2 * m - 1) * (1. - np.cos(theta) ** 2) ** (m / 2.)
+        if m > 0:
+            C *= (-1.)**m * special.factorial2(2 * m - 1)
+        val = C*(1. - np.cos(theta)**2)**(m/2.)
+        # val = C * (-1.) ** m * special.factorial2(2 * m - 1) * (1. - np.cos(theta) ** 2) ** (m / 2.)
         return val.reshape(-1, 1)
     elif lmax > m:
         vals = []
         C = np.exp(-0.5 * special.loggamma(2 * m + 1)) * np.sqrt((2. * m + 1.) / (4. * np.pi))
-        tmp = C * (-1.) ** m * special.factorial2(2 * m - 1) * (1. - np.cos(theta) ** 2) ** (m / 2.)
+        if m > 0:
+            C *= (-1.)**m * special.factorial2(2 * m - 1)
+        tmp = C*(1. - np.cos(theta)**2)**(m/2.)
+        # tmp = C * (-1.) ** m * special.factorial2(2 * m - 1) * (1. - np.cos(theta) ** 2) ** (m / 2.)
         vals.append(tmp.reshape(-1, 1))
         for l in range(m, lmax):
             if l > m:
