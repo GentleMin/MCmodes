@@ -14,8 +14,6 @@ m_val = 3
 bg_modes = [poly.SphericalHarmonicMode("tor", 1, 0, "2 Sqrt[pi/3] r")]
 mod_setup_MC = models.IdealMagnetoCoriolis
 parity = "same"
-# output_fname = "./out/T1pi__eigenspec__m{:d}__E_eta_{:.1e}__{:s}_parities".format(m_val, E_eta, parity)
-# output_fname = None
 output_fname = os.path.join(current_dir, "eigenspectra")
 
 
@@ -23,10 +21,9 @@ tools.print_heading(f"Calculating eigen spectrum for m = {m_val}, Le = {Le:.2e}"
     prefix='\n', suffix='\n', lines="over", char='=')
 
 resolutions = [
-    # (11, 11, m_val),
-    # (21, 21, m_val),    
-    (31, 31, m_val),
-    (41, 41, m_val)
+    (33, 33, m_val),
+    (43, 43, m_val),
+    (63, 63, m_val)
 ]
 if parity == "none":
     spectra = list()

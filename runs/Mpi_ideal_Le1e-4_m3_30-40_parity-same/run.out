@@ -4,19 +4,32 @@ Calculating eigen spectrum for m = 3, Le = 1.00e-04
 
 
 ----------------------------------------------------------------
-Resolution (L, N)=(31, 31)
+Resolution (L, N)=(33, 33)
 
-Build operator elapsed 1.55 s.
-DP system: 1708x1708
-Solve DP eigensystem elapsed 18.03 s.
-QP system: 1708x1708
-Solve QP eigensystem elapsed 17.94 s.
+Build operator elapsed 3.62 s.
+DP system: 1950x1950
+Solve DP eigensystem elapsed 66.58 s.
+QP system: 1950x1950
+Solve QP eigensystem elapsed 66.63 s.
 
 ----------------------------------------------------------------
-Resolution (L, N)=(41, 41)
+Resolution (L, N)=(43, 43)
 
-Build operator elapsed 2.68 s.
-DP system: 3078x3078
-Solve DP eigensystem elapsed 138.38 s.
-QP system: 3078x3078
-Solve QP eigensystem elapsed 137.42 s.
+Build operator elapsed 6.21 s.
+DP system: 3400x3400
+Solve DP eigensystem elapsed 363.43 s.
+QP system: 3400x3400
+Solve QP eigensystem elapsed 363.42 s.
+
+----------------------------------------------------------------
+Resolution (L, N)=(63, 63)
+
+Build operator elapsed 21.68 s.
+DP system: 7500x7500
+Solve DP eigensystem elapsed 3991.31 s.
+QP system: 7500x7500
+Solve QP eigensystem elapsed 3969.98 s.
+
+Eigenvalue spectra saved to /cluster/home/jinmin/MCmodes/runs/Mpi_ideal_Le1e-4_m3_30-40_parity-same/eigenspectra.h5
+================================================================
+

@@ -9,6 +9,7 @@ docs/
 test.py
 
 # Other files and folders
+.vscode/
 .settings/
 __pycache__/
 .ipynb_checkpoints

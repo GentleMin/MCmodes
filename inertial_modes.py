@@ -143,8 +143,9 @@ def transform_SH(vr_func, Ntrunc: int, m_val: int):
     """
     """
     xi, _ = specfun.roots_chebyt(2*Ntrunc)
-    Pmn_vals = [specfun.lpmn(m_val, Ntrunc, xi_tmp) for xi_tmp in xi]
-    Pmn = np.stack([Pmn_tmp[0][m_val, m_val:] for Pmn_tmp in Pmn_vals], axis=0)
+    # Pmn_vals = [specfun.assoc_legendre_p_all(m_val, Ntrunc, xi_tmp) for xi_tmp in xi]
+    # Pmn = np.stack([Pmn_tmp[0][m_val:, m_val] for Pmn_tmp in Pmn_vals], axis=0)
+    Pmn = specfun.assoc_legendre_p_all(Ntrunc, m_val, xi)[0, m_val:, m_val, :].T
     vr_vals = vr_func(np.arccos(xi))*np.ones_like(xi)
     c_SH = np.linalg.solve(Pmn.T @ Pmn, Pmn.T @ vr_vals)
     return c_SH
@@ -154,20 +155,23 @@ def rad2tan_B_single_m(Br_func, Ntrunc: int, m_val: int):
     """
     """
     xi, wt = specfun.roots_chebyt(2*Ntrunc)
-    Pmn_vals = [specfun.lpmn(m_val, Ntrunc, xi_tmp) for xi_tmp in xi]
-    Pmn = np.stack([Pmn_tmp[0][m_val, m_val:] for Pmn_tmp in Pmn_vals], axis=0)
+    # Pmn_vals = [specfun.assoc_legendre_p_all(m_val, Ntrunc, xi_tmp) for xi_tmp in xi]
+    # Pmn = np.stack([Pmn_tmp[0][m_val:, m_val] for Pmn_tmp in Pmn_vals], axis=0)
+    Pmn = specfun.assoc_legendre_p_all(Ntrunc, m_val, xi)[0, m_val:, m_val, :].T
     Br_vals = Br_func(np.arccos(xi))*np.ones_like(xi)
     cf = np.linalg.solve(Pmn.T @ Pmn, Pmn.T @ Br_vals)
     
     cf_gauss = cf/(np.arange(m_val, Ntrunc + 1) + 1)
     def B_t(t):
         xi_t = np.cos(t)
-        basis = np.stack([specfun.lpmn(m_val, Ntrunc, xi_tmp)[1][m_val, m_val:] for xi_tmp in xi_t], axis=0)
+        # basis = np.stack([specfun.assoc_legendre_p_all(m_val, Ntrunc, xi_tmp)[1][m_val:, m_val] for xi_tmp in xi_t], axis=0)
+        basis = specfun.assoc_legendre_p_all(Ntrunc, m_val, xi_t, diff_n=1)[1, m_val:, m_val, :].T
         return np.sin(t)*(basis @ cf_gauss)
     
     def B_p(t):
         xi_t = np.cos(t)
-        basis = np.stack([specfun.lpmn(m_val, Ntrunc, xi_tmp)[0][m_val, m_val:] for xi_tmp in xi_t], axis=0)
+        # basis = np.stack([specfun.assoc_legendre_p_all(m_val, Ntrunc, xi_tmp)[0][m_val:, m_val] for xi_tmp in xi_t], axis=0)
+        basis = specfun.assoc_legendre_p_all(Ntrunc, m_val, xi_t)[0, m_val:, m_val, :].T
         return -(1j*m_val/np.sin(t))*(basis @ cf_gauss)
     
     return B_t, B_p, cf_gauss
